@@ -314,7 +314,7 @@ app.post('/', function (req, res) {
           console.log("_--------------");
           console.log(mask);
           console.log("_____--------------");
-        
+
           // save the mask and individual aggregate
           var aggToSave = new Aggregate({
             _id: ID,
@@ -986,7 +986,7 @@ if (process.env.NODE_ENV === 'production') {
 var base_instance = require('../client/jiff/jiff-server').make_jiff(https, {logs:false});
 var jiff_instance = require('../client/jiff/ext/jiff-server-bignumber').make_jiff(base_instance);
 
-var mod = "18446744073709551557"; // 64 bits
+var mod = "1099511627776"; // 40 bits
 var mod_switch_date = new Date("Mar 23 13:39:01 2018 -0400").getTime();
 jiff_instance.compute('reconstruction-session', {Zp: new BigNumber(mod), onConnect: function(computation_instance) {
   computation_instance.listen('begin', function(_, session) {
@@ -1006,8 +1006,8 @@ jiff_instance.compute('reconstruction-session', {Zp: new BigNumber(mod), onConne
 
       // Agree on ordering on keys
       var keys = [];
-      for(var key in data[0].fields['Pacesetter Procurement Measure']) {
-        if(!data[0].fields['Pacesetter Procurement Measure'].hasOwnProperty(key)) continue;
+      for(var key in data[0].fields['Addressable spend']) {
+        if(!data[0].fields['Addressable spend'].hasOwnProperty(key)) continue;
         keys.push(key);
       }
       keys.sort();
@@ -1019,7 +1019,7 @@ jiff_instance.compute('reconstruction-session', {Zp: new BigNumber(mod), onConne
         for(var j = 0; j < keys.length; j++) {
           var key = keys[j];
 
-          var shares = computation_instance.share(data[i].fields['Pacesetter Procurement Measure'][key].value, 2, [1, "s1"], [1, "s1"]);
+          var shares = computation_instance.share(data[i].fields['Addressable spend'][key].value, 2, [1, "s1"], [1, "s1"]);
           var recons = shares["s1"].sadd(shares[1]);
           recons = recons.ssub(recons.cgteq(mods[i], 42).cmult(mods[i]));
           numbers[i][key] = recons;
@@ -1030,19 +1030,19 @@ jiff_instance.compute('reconstruction-session', {Zp: new BigNumber(mod), onConne
       var results = {};
       for(var j = 0; j < keys.length; j++) {
         var key = keys[j];
-        
+
         results[key] = numbers[0][key];
         for(var i = 1; i < numbers.length; i++) {
           results[key] = results[key].sadd(numbers[i][key]);
         }
       }
-      
+
       // open
       for(var i = 0; i < keys.length; i++) {
         computation_instance.open(results[keys[i]], [1]);
       };
     };
-    
+
     Aggregate.where({session: session}).find(function (err, data) {
       if (err) {
         console.log(err);
