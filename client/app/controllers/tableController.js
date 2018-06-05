@@ -55,6 +55,18 @@ define(['jquery', 'Handsontable', 'table_template', 'filesaver', 'alertify', 'qt
     }
   };
 
+  const headerMap = {
+    'NumContractedLocal': 'Number of Local MBEs Contracted',
+    'NumContractedState': 'Number of State MBEs Contracted',
+    'NumContractedNational': 'Number of National MBEs Contracted',
+    'TotalAmtLocal': 'Total Dollar Amount Spent Procuring All Goods and Services at the Local Level',
+    'TotalAmtState': 'Total Dollar Amount Spent Procuring All Goods and Services at the State Level',
+    'TotalAmtNational': 'Total Dollar Amount Spent Procuring All Goods and Services in the United States',
+    'DollarAmtLocal': 'Dollar Amount Spent with Local MBEs',
+    'DollarAmtState': 'Dollar Amount Spent with State MBEs',
+    'DollarAmtNational': 'Dollar Amount Spent with National MBEs',
+  };
+
 
   var table_widths = {};
 
@@ -764,50 +776,68 @@ define(['jquery', 'Handsontable', 'table_template', 'filesaver', 'alertify', 'qt
     $('header, #shadow').css('right', 0);
   }
 
-  function formatPacesettersData(tables) {
+  function formatPacesettersData(table) {
 
     var data = [];
-    var rows = table_template.tables[0].rows;
-    var numContracted = tables['NumContracted'].value;
-    var amtSpent = tables['DollarAmtLocal'].value;
+    data[0] = [];
+    data[1] = [];
 
-    var average = amtSpent / numContracted;
-
-    for (var k in tables) {
-      for (var i = 0; i < rows.length; i++) {
-        if (k === rows[i].key) {
-          data.push([rows[i].label, tables[k].value]);
-
-        }
-      }
+    for (var t in table) {
+      data[0].push([table[t].value]);
+      data[1].push(headerMap[t]);
     }
-    data.push(['Average Spent per Local MBE', average]);
+
     return data;
   }
 
   function displayReadTable(tables) {
 
-    var title = 'Pacesetters Procurement Measure';
     $('#tables-area').show();
 
-    tables = tables['Pacesetter Procurement Measure'];
+    for (var t in tables) {
+      var cl = t.toLowerCase().replace(/ /gi, '-');
+      var container = document.getElementById(cl);
 
+      var formattedTable = formatPacesettersData(tables[t]);
 
-    var container = document.getElementById('pacesetter-measure-hot');
+      var settings = {
+        colHeaders: ['Value for FY17'],
+        rowHeaders: formattedTable[1],
+        data: formattedTable[0],
+        readOnly: true,
+        colWidths: [190],
+        height: 230,
+        rowHeaderWidth: 480,
+        stretchH: 'last'
+      };
 
-    var data = formatPacesettersData(tables);
+      var handsOn = new Handsontable(container, settings);
 
-    var settings = {
-      colHeaders: ["Measure", "Value"],
-      data: data,
-      readOnly: true
+      handsOn.render();
+
+      $('#' + cl + '-name').text(t);
+
+      // updateTableWidth($('.wtHider').width() + 150);
+      //$('.ht_clone_top').hide();
+
     }
-    var handsOn = new Handsontable(container, settings);
-    handsOn.render();
-    $('#pacesetter-measure-hot-name').text(title);
 
-    updateTableWidth($('.wtHider').width() + 50);
-    $('.ht_clone_top').hide();
+
+    // var container = document.getElementById('pacesetter-measure-hot');
+
+    // var data = formatPacesettersData(tables);
+
+    // var settings = {
+    //   colHeaders: ["Measure", "Value"],
+    //   data: data,
+    //   readOnly: true
+    // }
+    // var handsOn = new Handsontable(container, settings);
+    // handsOn.render();
+    // $('#pacesetter-measure-hot-name').text(title);
+
+    // updateTableWidth($('.wtHider').width() + 50);
+    // $('.ht_clone_top').hide();
   }
 
   /**
@@ -899,15 +929,20 @@ define(['jquery', 'Handsontable', 'table_template', 'filesaver', 'alertify', 'qt
 
     var tables_csv = [];
 
-    tables_csv.push(['Pacesetter Procurement Measure']);
-    tables = tables['Pacesetter Procurement Measure']
+    for (var sheet in tables) {
+      var sheet_csv = [];
 
-    for (var k in tables) {
-      var value = tables[k].value;
-      tables_csv.push([k, value]);
+      sheet_csv.push([sheet]);
+
+      for (var row in tables[sheet]) {
+        sheet_csv.push([row, tables[sheet][row].value].join(','))
+      }
+      tables_csv.push(sheet_csv.join('\n'));
     }
-    tables_csv = tables_csv.join('\n');
+
+    tables_csv = tables_csv.join('\n\n\n');
     filesaver.saveAs(new Blob([tables_csv], {type: 'text/plain;charset=utf-8'}), 'Aggregate_Data_' + session + '.csv');
+
   }
 
   function saveQuestions(questions, session) {
