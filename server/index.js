@@ -983,64 +983,93 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 /** JIFF SETUP **/
-var base_instance = require('../client/jiff/jiff-server').make_jiff(https, {logs:false});
+var base_instance = require('../client/jiff/jiff-server').make_jiff(server, {logs:false}); // change server to https for production
 var jiff_instance = require('../client/jiff/ext/jiff-server-bignumber').make_jiff(base_instance);
 
-var mod = "1099511627776"; // 40 bits
-var mod_switch_date = new Date("Mar 23 13:39:01 2018 -0400").getTime();
-jiff_instance.compute('reconstruction-session', {Zp: new BigNumber(mod), onConnect: function(computation_instance) {
-  computation_instance.listen('begin', function(_, session) {
-    console.log("Begin");
-    var compute = function(data) {
-      var old_mod1 = new BigNumber("4294967296"); // 32 bits
-      var old_mod2 = new BigNumber("1099511627776"); // 40 bits
+var BigNumber = require('bignumber.js');
+var mod = new BigNumber(2).pow(76).minus(347); // 76 bits
+var old_mod = new BigNumber("1099511627776"); // 2^40
+jiff_instance.compute('reconstruction-session', {Zp: mod, onConnect: function(computation_instance) {
+  // listen for the 'ready' signal from the client
+  computation_instance.listen('ready', function(_, session) {
+  
+    // This function won't be executed immediadtly, first, the portion of code below will be executed first,
+    // that portion queries mongo db to get the various data entries, and then calls this function with that data,
+    // if errors are found or no data is found, this function wont be called and an error is returned to the client.
+    var compute = function(masks) {
+      console.log("BEGIN COMPUTE!");
 
-      // Figure out which mod to use for which party
-      var mods = [];
-      for(var i = 0; i < data.length; i++) {
-        mods[i] = old_mod1;
-        if(data[i].date > mod_switch_date) mods[i] = old_mod2;
-      }
-
-      computation_instance.emit("mods", [1], mods);
-
-      // Agree on ordering on keys
-      var keys = [];
-      for(var key in data[0].fields['Addressable spend']) {
-        if(!data[0].fields['Addressable spend'].hasOwnProperty(key)) continue;
-        keys.push(key);
-      }
-      keys.sort();
+      // start reconstruction
+      computation_instance.emit('begin', [1], "");
+      
+      // define order on keys
+      var top_level_keys = [ "Amount spent with MBEs",  "Addressable spend",  "Number of MBEs"];
+      var low_level_keys = {
+       "Amount spent with MBEs": [ "DollarAmtLocal", "DollarAmtState", "DollarAmtNational" ],
+       "Addressable spend": [ "TotalAmtLocal", "TotalAmtState", "TotalAmtNational" ],
+       "Number of MBEs": [ "NumContractedLocal", "NumContractedState", "NumContractedNational" ]
+      };
 
       // unmask
-      var numbers = [];
-      for(var i = 0; i < data.length; i++) {
-        numbers[i] = {};
-        for(var j = 0; j < keys.length; j++) {
-          var key = keys[j];
-
-          var shares = computation_instance.share(data[i].fields['Addressable spend'][key].value, 2, [1, "s1"], [1, "s1"]);
-          var recons = shares["s1"].sadd(shares[1]);
-          recons = recons.ssub(recons.cgteq(mods[i], 42).cmult(mods[i]));
-          numbers[i][key] = recons;
+      var sums_per_key = null;
+      function handle_one_party(n) {
+        console.log("HANDLING PARTY ", n);
+        // handled all inputs, done.
+        if(n >= masks.length) {
+          // open the sum of every keys
+          for (var i = 0; i < sums_per_key.length; i++)
+            computation_instance.open(sums_per_key[i], [1]);
+          return;
         }
-      }
-
-      // add
-      var results = {};
-      for(var j = 0; j < keys.length; j++) {
-        var key = keys[j];
-
-        results[key] = numbers[0][key];
-        for(var i = 1; i < numbers.length; i++) {
-          results[key] = results[key].sadd(numbers[i][key]);
+      
+        // handle input party i
+        var party_masks = [];
+        for(var i = 0; i < top_level_keys.length; i++) {
+          var top_key = top_level_keys[i];
+          for(var j = 0; j < low_level_keys[top_key].length; j++) {
+            var low_key = low_level_keys[top_key][j];
+            party_masks.push(masks[n].fields[top_key][low_key]);
+          }
         }
-      }
 
-      // open
-      for(var i = 0; i < keys.length; i++) {
-        computation_instance.open(results[keys[i]], [1]);
-      };
+        // Now party_masks has all masks for this party in order, share them
+        var party_reconstructed = [];
+        for(var i = 0; i < party_masks.length; i++) {
+          var value_shares = computation_instance.share(party_masks[i].value, 2, [1, "s1"], [1, "s1"]);
+          var reconstructed_share = value_shares[1].sadd(value_shares["s1"]); // reconstruct under MPC, watch out though, the mod that these values were shared under is 2^40
+          var correction_factor = reconstructed_share.cgteq(old_mod, 72).cmult(old_mod); // 0 if no correction needed, 2^40 if correction needed
+          reconstructed_share = reconstructed_share.ssub(correction_factor);
+          party_reconstructed.push(reconstructed_share);
+        }
+
+        // filter if amount spent is too big
+        var DollarAmtNational_share = party_reconstructed[5];
+        var condition = DollarAmtNational_share.cgt(50000000, 32); // check if greater than 50,000,000
+        for(var i = 0; i < 6; i++) { // fix first 6 answers (all dollar amounts)
+          var current_share = party_reconstructed[i];
+          var value_if_true = current_share.cdiv(1000, 32); // correct by removing three order of magnitude (this is integer division, floor)
+          var value_if_false = current_share;
+          var corrected_share = value_if_false.sadd(condition.smult(value_if_true.ssub(value_if_false)));
+          party_reconstructed[i] = corrected_share;
+        }
+
+        if(n == 0) sums_per_key = party_reconstructed; // first party, keep it aside
+        else { // not first party, add to sum so far
+          for(var i = 0; i < party_reconstructed.length; i++)
+            sums_per_key[i] = sums_per_key[i].sadd(party_reconstructed[i]);
+        }
+
+        var barrier_promises = [];
+        for(var i = 0; i < sums_per_key.length; i++) {
+          if(sums_per_key[i].promise != null)
+            barrier_promises.push(sums_per_key[i].promise);
+        }
+
+        if(barrier_promises.length == 0) handle_one_party(n+1);     
+        else Promise.all(barrier_promises).then(function() { handle_one_party(n+1); });
+      }
+      
+      handle_one_party(0);
     };
 
     Aggregate.where({session: session}).find(function (err, data) {
@@ -1051,14 +1080,8 @@ jiff_instance.compute('reconstruction-session', {Zp: new BigNumber(mod), onConne
       }
 
       // make sure query result is not empty
-      if (data.length >= 1) {
-        compute(data);
-        return;
-      }
-      else {
-        computation_instance.emit('error', [1], 'No submissions yet. Please come back later.');
-        return;
-      }
+      if (data.length >= 1) compute(data);
+      else computation_instance.emit('error', [1], 'No submissions yet. Please come back later.');
     });
   });
 }});

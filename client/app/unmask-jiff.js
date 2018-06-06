@@ -11,77 +11,112 @@
 
 // var masks: Array of form { fields: [], _id: user_id }
 define([], function () {
-  function reconstruct(session, masks, callback) {
+  function reconstruct(session, masks, callback) {  
     if (window.crypto == undefined) {
       window.crypto = window.msCrypto;
     }
     var hostname = window.location.href;
     hostname = hostname.substring(0, hostname.lastIndexOf("/"));
 
-    var mod = "1099511627776"; // 40 bits
+    var mod = new BigNumber(2).pow(76).minus(347); // 76 bits
+    var old_mod = new BigNumber("1099511627776"); // 2^40
     var jiff_instance;
 
-    var options = {party_count: 1, party_id: 1, Zp: new BigNumber(mod), autoConnect: false};
+    var options = {party_count: 1, party_id: 1, Zp: mod, autoConnect: false};
     options.onConnect = function (jiff_instance) {
-      jiff_instance.emit('begin', ["s1"], session);
+      jiff_instance.emit('ready', ["s1"], session);
 
-      jiff_instance.listen('mods', function (_, mods) {
-        // Agree on ordering on keys
-        var keys = [];
-        for (var key in masks[0]['Addressable spend']) {
-          if (!masks[0]['Addressable spend'].hasOwnProperty(key)) {
-            continue;
-          }
-          keys.push(key);
-        }
-        keys.sort();
+      jiff_instance.listen('begin', function (_, _) {
+        // define order on keys
+        var top_level_keys = [ "Amount spent with MBEs",  "Addressable spend",  "Number of MBEs"];
+        var low_level_keys = {
+         "Amount spent with MBEs": [ "DollarAmtLocal", "DollarAmtState", "DollarAmtNational" ],
+         "Addressable spend": [ "TotalAmtLocal", "TotalAmtState", "TotalAmtNational" ],
+         "Number of MBEs": [ "NumContractedLocal", "NumContractedState", "NumContractedNational" ]
+        };
 
         // unmask
-        var numbers = [];
-        for (var i = 0; i < masks.length; i++) {
-          numbers[i] = {};
-          mods[i] = new BigNumber(mods[i]);
+        var sums_per_key = null;
+        function handle_one_party(n) {
+          console.log("HANDLING PARTY ", n);
+          // all is done, open results
+          if(n >= masks.length) {
+            // open the sum of every keys
+            var promises = [];
+            for (var i = 0; i < sums_per_key.length; i++)
+              promises.push(jiff_instance.open(sums_per_key[i], [1]));
 
-          for (var j = 0; j < keys.length; j++) {
-            var key = keys[j];
+            // process
+            Promise.all(promises).then(function (open_sums_per_key) {
+              // convert format of result from a flat array to nested object with appropriate keys
+              var final_result = {};
+              var current_index = 0;
+              for(var i = 0; i < top_level_keys.length; i++) {
+                var top_key = top_level_keys[i];
+                final_result[top_key] = {};
+                for(var j = 0; j < low_level_keys[top_key].length; j++) {
+                  var low_key = low_level_keys[top_key][j];
+                  final_result[top_key][low_key] = open_sums_per_key[current_index].toString();
+                  current_index++;
+                }
+              }
 
-            var shares = jiff_instance.share(masks[i]['Addressable spend'][key].value, 2, [1, "s1"], [1, "s1"]);
-            var recons = shares["s1"].sadd(shares[1]);
-            recons = recons.ssub(recons.cgteq(mods[i], 42).cmult(mods[i]));
-            numbers[i][key] = recons;
-          }
-        }
-
-        // sum
-        var results = {};
-        for (var j = 0; j < keys.length; j++) {
-          var key = keys[j];
-
-          results[key] = numbers[0][key];
-          for (var i = 1; i < numbers.length; i++) {
-            results[key] = results[key].sadd(numbers[i][key]);
-          }
-        }
-
-        // open
-        var promises = [];
-        for (var i = 0; i < keys.length; i++) {
-          var key = keys[i];
-          promises.push(jiff_instance.open(results[key], [1]));
-        }
-        ;
-
-        // process
-        Promise.all(promises).then(function (results) {
-          var final_results = {};
-          for (var i = 0; i < keys.length; i++) {
-            final_results[keys[i]] = {value: results[i].toString()};
+              jiff_instance.disconnect();
+              console.log(final_result);
+              //callback(final_result);
+            });
+            return;
           }
 
-          jiff_instance.disconnect();
-          callback({'Addressable spend': final_results});
-        });
+          // handle input party i
+          var party_masks = [];
+          for(var i = 0; i < top_level_keys.length; i++) {
+            var top_key = top_level_keys[i];
+            for(var j = 0; j < low_level_keys[top_key].length; j++) {
+              var low_key = low_level_keys[top_key][j];
+              party_masks.push(masks[n][top_key][low_key]);
+            }
+          }
 
+          // Now party_masks has all masks for this party in order, share them
+          var party_reconstructed = [];
+          for(var i = 0; i < party_masks.length; i++) {
+            var value_shares = jiff_instance.share(party_masks[i].value, 2, [1, "s1"], [1, "s1"]);
+            var reconstructed_share = value_shares[1].sadd(value_shares["s1"]); // reconstruct under MPC
+            var correction_factor = reconstructed_share.cgteq(old_mod, 72).cmult(old_mod); // 0 if no correction needed, 2^40 if correction needed
+            reconstructed_share = reconstructed_share.ssub(correction_factor);
+            party_reconstructed.push(reconstructed_share);
+          }
+
+          // filter if amount spent is too big
+          var DollarAmtNational_share = party_reconstructed[5];
+          var condition = DollarAmtNational_share.cgt(50000000, 32); // check if greater than 50,000,000
+          for(var i = 0; i < 6; i++) { // fix first 6 answers (all dollar amounts)
+            var current_share = party_reconstructed[i];
+            var value_if_true = current_share.cdiv(1000, 32); // correct by removing three order of magnitude (this is integer division, floor)
+            var value_if_false = current_share;
+            var corrected_share = value_if_false.sadd(condition.smult(value_if_true.ssub(value_if_false)));
+            party_reconstructed[i] = corrected_share;
+          }
+
+          
+          if(n == 0) sums_per_key = party_reconstructed; // first party, keep it aside
+          else { // not first party, add to sum so far
+            for(var i = 0; i < party_reconstructed.length; i++)
+              sums_per_key[i] = sums_per_key[i].sadd(party_reconstructed[i]);
+          }
+
+          var barrier_promises = [];
+          for(var i = 0; i < sums_per_key.length; i++) {
+            if(sums_per_key[i].promise != null)
+              barrier_promises.push(sums_per_key[i].promise);
+          }
+
+          if(barrier_promises.length == 0) handle_one_party(n+1);     
+          else Promise.all(barrier_promises).then(function() { handle_one_party(n+1); });
+        }
+
+        handle_one_party(0);
       });
     }
 
