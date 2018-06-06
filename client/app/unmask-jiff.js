@@ -11,7 +11,7 @@
 
 // var masks: Array of form { fields: [], _id: user_id }
 define([], function () {
-  function reconstruct(session, masks, callback) {  
+  function reconstruct(session, masks, callback) {
     if (window.crypto == undefined) {
       window.crypto = window.msCrypto;
     }
@@ -39,6 +39,9 @@ var mod = new BigNumber(2).pow(77).minus(451); // 77 bits
         var sums_per_key = null;
         function handle_one_party(n) {
           console.log("HANDLING PARTY ", n);
+          var progress = document.getElementById('progress');
+          progress.style.width = parseInt(100 / masks.length * n) + '%';
+          progress.innerHTML = parseInt(100 / masks.length * n) + '%';
           // all is done, open results
           if(n >= masks.length) {
             // open the sum of every keys
@@ -99,7 +102,7 @@ var mod = new BigNumber(2).pow(77).minus(451); // 77 bits
             party_reconstructed[i] = corrected_share;
           }
 
-          
+
           if(n == 0) sums_per_key = party_reconstructed; // first party, keep it aside
           else { // not first party, add to sum so far
             for(var i = 0; i < party_reconstructed.length; i++)
@@ -112,7 +115,7 @@ var mod = new BigNumber(2).pow(77).minus(451); // 77 bits
               barrier_promises.push(sums_per_key[i].promise);
           }
 
-          if(barrier_promises.length == 0) handle_one_party(n+1);     
+          if(barrier_promises.length == 0) handle_one_party(n+1);
           else Promise.all(barrier_promises).then(function() { handle_one_party(n+1); });
         }
 

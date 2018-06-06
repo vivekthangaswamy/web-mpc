@@ -983,7 +983,7 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 /** JIFF SETUP **/
-var base_instance = require('../client/jiff/jiff-server').make_jiff(server, {logs:false}); // change server to https for production
+var base_instance = require('../client/jiff/jiff-server').make_jiff(https, {logs:false}); // change server to https for production
 var jiff_instance = require('../client/jiff/ext/jiff-server-bignumber').make_jiff(base_instance);
 
 var BigNumber = require('bignumber.js');
@@ -992,7 +992,7 @@ var old_mod = new BigNumber("1099511627776"); // 2^40
 jiff_instance.compute('reconstruction-session', {Zp: mod, onConnect: function(computation_instance) {
   // listen for the 'ready' signal from the client
   computation_instance.listen('ready', function(_, session) {
-  
+
     // This function won't be executed immediadtly, first, the portion of code below will be executed first,
     // that portion queries mongo db to get the various data entries, and then calls this function with that data,
     // if errors are found or no data is found, this function wont be called and an error is returned to the client.
@@ -1001,7 +1001,7 @@ jiff_instance.compute('reconstruction-session', {Zp: mod, onConnect: function(co
 
       // start reconstruction
       computation_instance.emit('begin', [1], "");
-      
+
       // define order on keys
       var top_level_keys = [ "Amount spent with MBEs",  "Addressable spend",  "Number of MBEs"];
       var low_level_keys = {
@@ -1021,7 +1021,7 @@ jiff_instance.compute('reconstruction-session', {Zp: mod, onConnect: function(co
             computation_instance.open(sums_per_key[i], [1]);
           return;
         }
-      
+
         // handle input party i
         var party_masks = [];
         for(var i = 0; i < top_level_keys.length; i++) {
@@ -1065,10 +1065,10 @@ jiff_instance.compute('reconstruction-session', {Zp: mod, onConnect: function(co
             barrier_promises.push(sums_per_key[i].promise);
         }
 
-        if(barrier_promises.length == 0) handle_one_party(n+1);     
+        if(barrier_promises.length == 0) handle_one_party(n+1);
         else Promise.all(barrier_promises).then(function() { handle_one_party(n+1); });
       }
-      
+
       handle_one_party(0);
     };
 
