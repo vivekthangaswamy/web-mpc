@@ -987,7 +987,7 @@ var base_instance = require('../client/jiff/jiff-server').make_jiff(server, {log
 var jiff_instance = require('../client/jiff/ext/jiff-server-bignumber').make_jiff(base_instance);
 
 var BigNumber = require('bignumber.js');
-var mod = new BigNumber(2).pow(76).minus(347); // 76 bits
+var mod = new BigNumber(2).pow(77).minus(451); // 77 bits
 var old_mod = new BigNumber("1099511627776"); // 2^40
 jiff_instance.compute('reconstruction-session', {Zp: mod, onConnect: function(computation_instance) {
   // listen for the 'ready' signal from the client
@@ -1037,17 +1037,17 @@ jiff_instance.compute('reconstruction-session', {Zp: mod, onConnect: function(co
         for(var i = 0; i < party_masks.length; i++) {
           var value_shares = computation_instance.share(party_masks[i].value, 2, [1, "s1"], [1, "s1"]);
           var reconstructed_share = value_shares[1].sadd(value_shares["s1"]); // reconstruct under MPC, watch out though, the mod that these values were shared under is 2^40
-          var correction_factor = reconstructed_share.cgteq(old_mod, 72).cmult(old_mod); // 0 if no correction needed, 2^40 if correction needed
+          var correction_factor = reconstructed_share.cgteq(old_mod, 73).cmult(old_mod); // 0 if no correction needed, 2^40 if correction needed
           reconstructed_share = reconstructed_share.ssub(correction_factor);
           party_reconstructed.push(reconstructed_share);
         }
 
         // filter if amount spent is too big
         var DollarAmtNational_share = party_reconstructed[5];
-        var condition = DollarAmtNational_share.cgt(50000000, 32); // check if greater than 50,000,000
+        var condition = DollarAmtNational_share.cgt(50000000, 33); // check if greater than 50,000,000
         for(var i = 0; i < 6; i++) { // fix first 6 answers (all dollar amounts)
           var current_share = party_reconstructed[i];
-          var value_if_true = current_share.cdiv(1000, 32); // correct by removing three order of magnitude (this is integer division, floor)
+          var value_if_true = current_share.cdiv(1000, 33); // correct by removing three order of magnitude (this is integer division, floor)
           var value_if_false = current_share;
           var corrected_share = value_if_false.sadd(condition.smult(value_if_true.ssub(value_if_false)));
           party_reconstructed[i] = corrected_share;
