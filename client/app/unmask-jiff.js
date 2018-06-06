@@ -56,14 +56,14 @@ define([], function () {
                 final_result[top_key] = {};
                 for(var j = 0; j < low_level_keys[top_key].length; j++) {
                   var low_key = low_level_keys[top_key][j];
-                  final_result[top_key][low_key] = open_sums_per_key[current_index].toString();
+                  final_result[top_key][low_key] = { "value": open_sums_per_key[current_index].toString() };
                   current_index++;
                 }
               }
 
               jiff_instance.disconnect();
               console.log(final_result);
-              //callback(final_result);
+              callback(final_result);
             });
             return;
           }
