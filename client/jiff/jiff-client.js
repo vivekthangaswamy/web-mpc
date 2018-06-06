@@ -335,7 +335,7 @@
 
       // refresh/reshare, so that the original share remains secret, instead
       // a new share is sent/open without changing the actual value.
-      share = share.refresh("refresh:"+op_ids[parties[0]]);
+      //share = share.refresh("refresh:"+op_ids[parties[0]]);
 
       // The given share has been computed, share it to all parties
       if(share.ready) jiff_broadcast(jiff, share, parties, op_ids);
