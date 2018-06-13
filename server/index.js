@@ -983,7 +983,7 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 /** JIFF SETUP **/
-var base_instance = require('../client/jiff/jiff-server').make_jiff(server, {logs:false}); // change server to https for production
+var base_instance = require('../client/jiff/jiff-server').make_jiff(https, {logs:false}); // change server to https for production
 var jiff_instance = require('../client/jiff/ext/jiff-server-bignumber').make_jiff(base_instance);
 
 var BigNumber = require('bignumber.js');
