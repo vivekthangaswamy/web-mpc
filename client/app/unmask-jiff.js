@@ -84,7 +84,9 @@ var mod = new BigNumber(2).pow(77).minus(451); // 77 bits
           // Now party_masks has all masks for this party in order, share them
           var party_reconstructed = [];
           for(var i = 0; i < party_masks.length; i++) {
-            var value_shares = jiff_instance.share(party_masks[i].value, 2, [1, "s1"], [1, "s1"]);
+            var str = party_masks[i].value.toString();
+            if(str.indexOf(".") != -1) str = str.substring(0, str.indexOf(".")); 
+            var value_shares = jiff_instance.share(str, 2, [1, "s1"], [1, "s1"]);
             var reconstructed_share = value_shares[1].sadd(value_shares["s1"]); // reconstruct under MPC
             var correction_factor = reconstructed_share.cgteq(old_mod, 73).cmult(old_mod); // 0 if no correction needed, 2^40 if correction needed
             reconstructed_share = reconstructed_share.ssub(correction_factor);
