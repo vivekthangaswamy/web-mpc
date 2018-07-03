@@ -557,6 +557,10 @@
    *
    */
   function receive_triplet(jiff, triplet_id, triplet) {
+    // Deferred is already setup, resolve it.
+    if(jiff.deferreds[triplet_id] == null)
+      return;
+
     triplet = jiff.execute_array_hooks('receiveTriplet', [jiff, triplet], 1);
 
     // Deferred is already setup, resolve it.
@@ -648,10 +652,14 @@
    * @param {number} number_id - the id of the number.
    * @param {number} share - the value of the share.
    */
+
   function receive_server_share_number(jiff, number_id, share) {
+    // Deferred is already setup, resolve it.
+    if(jiff.deferreds[number_id] == null)
+      return;
+      
     share = jiff.execute_array_hooks('receiveNumber', [jiff, share], 1);
 
-    // Deferred is already setup, resolve it.
     jiff.deferreds[number_id].resolve(share);
     jiff.deferreds[number_id] = null;
   }
@@ -1613,6 +1621,7 @@
      * @memberof jiff.secret-share
      */
     self.sdiv = function(o, l, op_id) {
+     try {
       if (!(o.jiff === self.jiff)) throw "shares do not belong to the same instance (!=)";
       if (!(o.Zp === self.Zp)) throw "shares must belong to the same field (!=)";
       if (!self.jiff.helpers.array_equals(self.holders, o.holders)) throw "shares must be held by the same parties (!=)";
@@ -1634,6 +1643,7 @@
 
       if(op_id != null) q_shr.id = op_id;
       return q_shr;
+    } catch(err) { console.log(err); }
     };
 
     /**
@@ -1979,6 +1989,7 @@
       // identification
       if(options.__internal_socket == null) {
         jiff.socket.on('connect', function() {
+          console.log("connection");
           jiff.socket.emit("computation_id", JSON.stringify({ "computation_id": computation_id, "party_id": jiff.id, "party_count": jiff.party_count }));
         });
         jiff.socket.connect();
@@ -1986,7 +1997,6 @@
       else
         jiff.socket.emit("computation_id", JSON.stringify({ "computation_id": computation_id, "party_id": jiff.id, "party_count": jiff.party_count }));
     }
-    if(!(options.autoConnect === false)) jiff.connect();
 
     /**
      * Send a custom message to a subset of parties.
@@ -2558,18 +2568,22 @@
 
     jiff.socket.on('error', function(msg) {
       console.log("RECEIVED ERROR FROM SERVER");
-      jiff.socket = null;
+      /*jiff.socket = null;
       jiff.__ready = false;
 
       if(options.onError != null)
         options.onError(msg);
 
       throw msg;
+      */
     });
 
     jiff.socket.on('disconnect', function(reason) {
       console.log("Disconnected! " + reason);
     });
+
+    // Connect after everything is set up.
+    if(!(options.autoConnect === false)) jiff.connect();
 
     return jiff;
   }

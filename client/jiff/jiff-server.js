@@ -26,8 +26,7 @@ module.exports = {
     };
 
     // Import socket.io
-    var io = require('socket.io')(http);
-    // var io = require('socket.io')(http, { pingTimeout: 360000, pingInterval: 180000 });
+    var io = require('socket.io')(http, { pingTimeout: 360000, pingInterval: 60000 });
     jiff.io = io;
 
     // { computation_id -> { party_id -> socket_id } }
@@ -222,7 +221,7 @@ module.exports = {
 
       // Receive each user's public key
       socket.on('public_key', function(msg) {
-//        jiff.sodium_promise.then(function() {
+          // jiff.sodium_promise.then(function() {
           var party_id = party_map[socket.id];
           var computation_id = computation_map[socket.id];
 
