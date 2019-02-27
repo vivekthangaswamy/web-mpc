@@ -50,15 +50,6 @@ define(['jquery', 'controllers/clientController', 'controllers/tableController',
       }
     }
 
-    function createResizeSensors(tables) {
-      tables.forEach(function (t) {
-        var div = $('#' + t.rootElement.id);
-        new ResizeSensor((div).find('.wtHider').first()[0], function () {
-          tableController.updateWidth(tables);
-        });
-      });
-    }
-
     function clientControllerView() {
 
       $(document).ready(function () {
@@ -67,13 +58,11 @@ define(['jquery', 'controllers/clientController', 'controllers/tableController',
 
         tableController.createTableElems(table_template.tables, '#tables-area');
         displaySurveyQuestions();
-        // Create the tabless
+        // Create the tables
         var tables = tableController.makeTables(table_template.tables);
 
         usabilityController.initialize();
         usabilityController.saveBrowser();
-        // TODO
-        //createResizeSensors(tables); THIS FUNCTION BREAKS THINGS I THINK! -IRA
 
         var totals_table = null;
 
@@ -142,8 +131,8 @@ define(['jquery', 'controllers/clientController', 'controllers/tableController',
           }
         };
 
-        //var _target = document.getElementById('drop-area');
-        //var _choose = document.getElementById('choose-file-button');
+        var _target = document.getElementById('drop-area');
+        var _choose = document.getElementById('choose-file-button');
         var spinner;
         var _workstart = function () {
           spinner = new Spinner().spin(_target);
@@ -172,20 +161,7 @@ define(['jquery', 'controllers/clientController', 'controllers/tableController',
           spinner.stop();
         };
 
-        var $window, availableWidth, availableHeight;
-        var calculateSize = function () {
-          availableWidth = Math.max($('#drop-area').width(), 600);
-          availableHeight = Math.max($window.height() - 250, 400);
-        };
-
-        $(document).ready(function () {
-          $window = $(window);
-          $window.on('resize', calculateSize);
-        });
-
-
         var _onsheet = function (json, cols, sheetnames, select_sheet_cb) {
-          calculateSize();
           if (!json) {
             json = [];
           }
@@ -199,20 +175,19 @@ define(['jquery', 'controllers/clientController', 'controllers/tableController',
 
             return o;
           }(cols));
-          calculateSize();
         };
 
-        /*DropSheet({
+        DropSheet({
           drop: _target,
           choose: _choose,
           tables: tables,
           tables_def: table_template,
           on: {workstart: _workstart, workend: _workend, sheet: _onsheet},
           errors: {badfile: _badfile, pending: _pending, failed: _failed, large: _large}
-        });*/
+        });
 
         // Table accordion.
-        //$('#tables-area').hide();
+        $('#tables-area').hide();
 
         $('#expand-table-button').click(function (e) {
           $('#tables-area').slideToggle(function () {
