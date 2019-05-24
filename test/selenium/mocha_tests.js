@@ -11,7 +11,9 @@ let sessionPassword = null;
 const numberOfParticipants = 2;
 const dataValue = 1;
 
-const participant_codes = [];
+const shortTimeout = 5000;
+const medTimeout = 20000;
+const longTimeout = 200000;
 const participant_links = [];
 
 function createDriver() {
@@ -37,7 +39,7 @@ describe('End-to-end workflow tests', function() {
 
   it('Basic end to end test with cohort self selection', async () => {
     await createSession(driver);
-    // await generateParticipantLinks(driver);
+    await generateParticipantLinks(driver, 'null');
     // await dataSubmission(driver);
     // await closeSession(driver);
     // await unmaskData(driver);
@@ -70,7 +72,7 @@ describe('End-to-end workflow tests', function() {
             driver.findElement(By.id('generate')).click();
             return true;
           } 
-        }, 5000);
+        }, shortTimeout);
 
         // save session information
         await driver.wait(async function() {
@@ -87,91 +89,70 @@ describe('End-to-end workflow tests', function() {
             });
 
             if (sessionKey.length === 26 && sessionPassword.length === 26) {
+              console.log('Session key: ' + sessionKey);
+              console.log('Session pass: ' + sessionPassword);
               return true;
             }
           }
-        }, 5000);
+        }, shortTimeout);
 
         await driver.wait(async function() {
           return driver.findElement(By.id('link-id')).isDisplayed();
-        }, 5000);
+        }, shortTimeout);
       });
     } catch (e) {
       handleFailure(e, driver);
     }
   }
 
-  async function generateParticipantLinks(driver) {
+  async function generateParticipantLinks(driver, cohort) {
     try {
       await driver.get('localhost:8080/manage').then(async function () {
+        
+        // login
         await driver.wait(async function() {
           const key = await driver.findElement(By.id('session'));
           const pw = await driver.findElement(By.id('password'));
-          // if (key.isDisplayed() && pw.isDisplayed()) {
-          //   key.sendKeys(sessionKey);
-          //   pw.sendKeys(sessionPassword);
-          //   driver.findElement(By.id('login')).click();
-          //   return true;
-          // }
-        }, 5000);
-                // wait for fields to appear, then enter session password (SessionKey should be filled already)
-        // await driver.wait(async function() {
-        //   const key = await driver.findElement(By.id('session'));
-        //   // const pw = await driver.findElement(By.id('password'));
-        //   // if (key.isDisplayed() && pw.isDisplayed()) {
-        //     // key.click();
-        //     // key.sendKeys(sessionKey);
-        //     // pw.click();
-        //     // pw.sendKeys(sessionPassword);
-        //     // // driver.findElement(By.id('login')).click();
-        //     return true;
-        //   // }
-        //   // return false;
-        // }, 5000);
-    
+          if (key.isDisplayed() && pw.isDisplayed()) {
+            key.sendKeys(sessionKey);
+            pw.sendKeys(sessionPassword);
+            await driver.findElement(By.id('login')).click();
+            return true;
+          }
+        }, shortTimeout);
+
+        driver.sleep(1000);
+
+        await driver.wait(function () {
+          return driver.findElement(By.id('participants-submit-' + cohort)).isDisplayed();
+        }, longTimeout);
+        await driver.findElement(By.id('participants-count-' + cohort))
+          .then((description) => description.sendKeys(numberOfParticipants.toString()))
+          .then(() => driver.findElement(By.id('participants-submit-' + cohort)).click());
+
+        await driver.wait(function () {
+          return driver.findElement(By.id('participants-new-' + cohort)).isDisplayed();
+        }, longTimeout);
+
+        await driver.findElement(By.id('participants-new-' + cohort))
+        .then((participants) => participants.getText().then(function (text) {
+          var participants = text.trim().split('\n');
+          for (var i = 0; i < participants.length; i++) {
+            participants[i] = participants[i].trim();
+            participant_links.push(participants[i]);
+          }
+          expect(participant_links.length).to.equal(numberOfParticipants);
+          console.log('Number of links: ', participant_links.length);
+          console.log(participant_links);
+        }) );
       });
-  
-      // await driver.sleep(200);
-      // await driver.wait(function() {
-      //   return driver.findElement(By.id('session-start')).isDisplayed();
-      // }, 20000);
-      // //start session
-      // await driver.findElement(By.id('session-start'))
-      //   .then((startButton) => startButton.click() );
-  
-      // await driver.sleep(100);
-      // //add participants
-      // await driver.wait(function () {
-      //   return driver.findElement(By.id('participants-submit')).isDisplayed();
-      // }, 20000);
-      // await driver.findElement(By.id('participants-count-null'))
-      //   .then((description) => description.sendKeys(numberOfParticipants.toString()) )
-      //   .then(() => driver.findElement(By.id('participants-submit')).click() );
-  
-      // await driver.wait(function () {
-      //   return driver.findElement(By.id('participants-new')).isDisplayed();
-      // }, 10000);
-      // await driver.findElement(By.id('participants-new'))
-      //   .then((participants) => participants.getText().then(function (text) {
-      //     var participants = text.trim().split('\n');
-      //     for (var i = 0; i < participants.length; i++) {
-      //       participants[i] = participants[i].trim();
-      //       participant_links.push(participants[i]);
-  
-      //       if (participants[i] !== '') {
-      //         var index = participants[i].indexOf('participationCode') + 'participationCode'.length + 1;
-      //         participant_codes.push(participants[i].substring(index));
-      //       }
-      //     }
-      //     expect(participant_links.length).to.equal(numberOfParticipants);
-      //     console.log('Number of links: ', participant_links.length);
-      //     console.log(participant_links);
-      //   }) );
-      } catch (e) {
-      handleFailure(e, driver)
+    } catch (e) {
+      handleFailure(e, driver);
     }
   }
-
+   
+  
+ 
   async function closeSession(driver) {
     try {
       //switch back to manage page
@@ -189,7 +170,7 @@ describe('End-to-end workflow tests', function() {
             return true;
           }
           return false;
-        }, 5000);
+        }, shortTimeout);
 
         await driver.wait(async function () {
           console.log('Stopped session')
@@ -200,7 +181,7 @@ describe('End-to-end workflow tests', function() {
             return true;
           }
           return false;
-        }, 5000);
+        }, shortTimeout);
 
         await driver.wait(async function () {
           var confirm = driver.findElement(By.id('session-close-confirm'));
@@ -210,7 +191,7 @@ describe('End-to-end workflow tests', function() {
             return true;
           }
           return false;
-        }, 5000);
+        }, shortTimeout);
 
         // await driver.sleep(500);
         // var confirmButton = await driver.findElement(By.id('session-close-confirm'));
@@ -225,7 +206,7 @@ describe('End-to-end workflow tests', function() {
             return true;
           }
           return false;
-        }, 5000);
+        }, shortTimeout);
   
         // unmask
         await driver.sleep(500);
@@ -308,7 +289,7 @@ describe('End-to-end workflow tests', function() {
               } else {
                 return false;
               }
-            }, 5000);
+            }, shortTimeout);
 
             // await driver.wait(async function() {
             //   var verifyBox = await driver.findElement(By.id('verify'));
@@ -329,7 +310,7 @@ describe('End-to-end workflow tests', function() {
             //     }
             //   }
             //   return false;
-            // }, 5000);
+            // }, shortTimeout);
   
             var verifyBox = await driver.findElement(By.id('verify'));
             verifyBox.click();
@@ -350,7 +331,7 @@ describe('End-to-end workflow tests', function() {
                 }
               }
               return false;
-            }, 5000);
+            }, shortTimeout);
 
 
             await driver.wait(async function() {
