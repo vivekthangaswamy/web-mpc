@@ -15,7 +15,6 @@
     "compression": "^1.7.1",
     "cross-env": "^5.0.5",
     "express": "^4.15.3",
-    "forge": "^2.3.0",
     "greenlock-express": "^2.0.11",
     "increase-memory-limit": "^1.0.3",
     "jiff-mpc": "file:jiff",
@@ -26,15 +25,22 @@
     "mongoose": "^4.11.1",
     "numeric": "^1.2.6",
     "nunjucks": "^3.1.7",
-    "spdy": "^3.4.7"
+    "spdy": "^3.4.7",
+    "chromedriver": "^74.0.0",
+    "forge": "^2.3.0",
+    "mocha": "^6.1.4",
+    "selenium-webdriver": "^4.0.0-alpha.1"
   },
   "devDependencies": {
+    "chai": "^4.2.0",
     "eslint": "^3.19.0",
     "eslint-config-airbnb-base": "^11.2.0",
     "eslint-plugin-import": "^2.7.0",
     "eslint-plugin-requirejs": "^3.1.1"
   },
-  "scripts": {},
+  "scripts": {
+    "test": "mocha --timeout 1200000 test/selenium/mocha_tests.js"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/multiparty/web-mpc.git"
