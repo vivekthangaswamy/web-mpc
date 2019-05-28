@@ -256,40 +256,41 @@ describe('End-to-end workflow tests', function() {
       for (var i = 0; i < participant_links.length; i++){
         await driver.get(participant_links[i])
           .then(async function () {
-            driver.sleep(2000); // wait for dom to load
+
+            // driver.sleep(2000); // wait for dom to load
 
             // wait to have the session id / code verified
             await driver.wait(function() {
               return driver.findElement(By.id('participation-code-success')).isDisplayed();
             }, 10000);
 
-            var fileUpload = await driver.findElement(By.id('choose-file'));
-            var filePath = process.cwd() + '/test/selenium/files/bwwc.xlsx';
-            fileUpload.sendKeys(filePath);
+            // var fileUpload = await driver.findElement(By.id('choose-file'));
+            // var filePath = process.cwd() + '/test/selenium/files/bwwc.xlsx';
+            // fileUpload.sendKeys(filePath);
 
-            //wait for upload success
-            await driver.wait(async function() {
-              var ok = await driver.findElements(By.className('ajs-ok'));
-              if (ok.length > 0) {
-                ok[0].click();
-                return true;
-              } else {
-                return false;
-              }
-            }, 20000);
+            // //wait for upload success
+            // await driver.wait(async function() {
+            //   var ok = await driver.findElements(By.className('ajs-ok'));
+            //   if (ok.length > 0) {
+            //     ok[0].click();
+            //     return true;
+            //   } else {
+            //     return false;
+            //   }
+            // }, 20000);
   
-            await driver.wait(async function() {
-              //find all
-              var surveyOpts = await driver.findElements(By.xpath('//input[@name="optradio" and @value="1"]'));
-              if (surveyOpts[0].isSelected()) {
-                for (var k = 0; k < surveyOpts.length; k++) {
-                  surveyOpts[k].click();
-                }
-                return true;
-              } else {
-                return false;
-              }
-            }, shortTimeout);
+            // await driver.wait(async function() {
+            //   //find all
+            //   var surveyOpts = await driver.findElements(By.xpath('//input[@name="optradio" and @value="1"]'));
+            //   if (surveyOpts[0].isSelected()) {
+            //     for (var k = 0; k < surveyOpts.length; k++) {
+            //       surveyOpts[k].click();
+            //     }
+            //     return true;
+            //   } else {
+            //     return false;
+            //   }
+            // }, shortTimeout);
 
             // await driver.wait(async function() {
             //   var verifyBox = await driver.findElement(By.id('verify'));
@@ -312,36 +313,36 @@ describe('End-to-end workflow tests', function() {
             //   return false;
             // }, shortTimeout);
   
-            var verifyBox = await driver.findElement(By.id('verify'));
-            verifyBox.click();
-            await driver.sleep(2000);
+            // var verifyBox = await driver.findElement(By.id('verify'));
+            // verifyBox.click();
+            // await driver.sleep(2000);
 
-            await driver.wait(async function () {
-              var button = await driver.findElement(By.id('submit'));
-              if (button.isEnabled()) {
-                // button.click();
-                await driver.sleep(2000);
-                button.click();
+            // await driver.wait(async function () {
+            //   var button = await driver.findElement(By.id('submit'));
+            //   if (button.isEnabled()) {
+            //     // button.click();
+            //     await driver.sleep(2000);
+            //     button.click();
 
-                var checked = await verifyBox.isSelected();
-                console.log('verify', checked);
+            //     var checked = await verifyBox.isSelected();
+            //     console.log('verify', checked);
 
-                if (checked) {
-                  return true;
-                }
-              }
-              return false;
-            }, shortTimeout);
+            //     if (checked) {
+            //       return true;
+            //     }
+            //   }
+            //   return false;
+            // }, shortTimeout);
 
 
-            await driver.wait(async function() {
-              var ok = await driver.findElements(By.id('submission-success'));
-              if (ok.length > 0) {
-                return true;
-              } else {
-                return false;
-              }
-            }, 20000);
+            // await driver.wait(async function() {
+            //   var ok = await driver.findElements(By.id('submission-success'));
+            //   if (ok.length > 0) {
+            //     return true;
+            //   } else {
+            //     return false;
+            //   }
+            // }, 20000);
           });
       }
     } catch (err) {
