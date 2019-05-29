@@ -10,11 +10,12 @@ let sessionPassword = null;
 
 const numberOfParticipants = 2;
 const dataValue = 1;
-const numberOfCohorts = 2;
+const numberOfCohorts = 1;
 
 const shortTimeout = 5000;
 const medTimeout = 20000;
 const longTimeout = 200000;
+const unmaskingTimeout = 500000;
 const participant_links = [];
 
 function createDriver() {
@@ -43,7 +44,7 @@ describe('End-to-end workflow tests', function() {
     await generateParticipantLinks(driver, 'null');
     await dataSubmission(driver);
     await closeSession(driver);
-    // await unmaskData(driver);
+    await unmaskData(driver);
   });    
 
   // - - - - - - - 
@@ -163,13 +164,29 @@ describe('End-to-end workflow tests', function() {
           console.log(participant_links);
         }));
 
-        await driver.findElement(By.id('session-status'))
-        .then((status) => status.getText().then(function(t) {
-          if (t !== '') {
-              expect(t).to.equal('STARTED');
-              return true;
+        await driver.wait(async function () {
+          const status = await driver.findElement(By.id('session-status'));
+          var text = ''
+
+          if (status.isDisplayed()) {
+            await status.getText().then(function(t) {
+              text = t;
+            });
           }
-        }));
+
+          if (text === 'STARTED') {
+            console.log('status: ', text);
+            return true;
+          }
+        }, medTimeout);
+
+        // await driver.findElement(By.id('session-status'))
+        // .then((status) => status.getText().then(function(t) {
+        //   if (t !== '') {
+        //       expect(t).to.equal('STARTED');
+        //       return true;
+        //   }
+        // }));
       });
     } catch (e) {
       handleFailure(e, driver);
@@ -216,19 +233,10 @@ describe('End-to-end workflow tests', function() {
             var verify = await driver.findElement(By.id('verify'));
             var submit = await driver.findElement(By.id('submit'));
             if (verify.isEnabled()) {
-              // await driver.sleep(shortTimeout);
-              // verify.click();
-              // await driver.sleep(shortTimeout);
-              // submit.click();
-
               var checked = await verify.isSelected();
-              console.log('checked', checked);
               var enabled = await submit.isEnabled();
               if (checked && enabled) {
                 submit.click();
-                // submit.click();
-                // submit.click();
- 
                 return true;
               } else {
                 verify.click();
@@ -254,7 +262,6 @@ describe('End-to-end workflow tests', function() {
  
   async function closeSession(driver) {
     try {
-      //switch back to manage page
       await driver.get('localhost:8080/manage').then(async function() {
         await driver.wait(async function () {
           var session = driver.findElement(By.id('session'));
@@ -267,32 +274,47 @@ describe('End-to-end workflow tests', function() {
           }
         }, shortTimeout);
 
+        await driver.sleep(1000);
+
         await driver.wait(async function () {
-          var sessionStop = await driver.findElement(By.id('session-stop'));
-        
-          if (sessionStop.isEnabled()) {
+          const sessionStop = await driver.findElement(By.id('session-stop'));
+          const enabled = await sessionStop.isEnabled();
+          if (enabled) {
+            await driver.sleep(500);
             sessionStop.click();
             return true;
           }
         }, longTimeout);
 
         await driver.wait(async function () {
-          var confirm = await driver.findElement(By.id('session-close-confirm'));
-        
-          if (confirm.isEnabled()) {
+          const confirm = await driver.findElement(By.id('session-close-confirm'));
+          const enabled = await confirm.isEnabled();
+
+          if (enabled) {
+            await driver.sleep(500);
             confirm.click();
             return true;
           }
         }, longTimeout);
+        
+        await driver.wait(async function () {
+          const status = await driver.findElement(By.id('session-status'));
+          var text = ''
 
-        await driver.findElement(By.id('session-status'))
-          .then((status) => status.getText().then(function(t) {
-            if (t !== '') {
-                expect(t).to.equal('STOPPED');
-                return true;
-            }
-          }));
-        });
+          if (status.isDisplayed()) {
+            await status.getText().then(function(t) {
+              text = t;
+            });
+          }
+
+          if (text === 'STOPPED') {
+            console.log('status: ', text);
+            return true;
+          }
+        }, longTimeout);
+
+        // wait for history to update
+        await driver.sleep(10000); 
 
         for (var i = 0; i < numberOfCohorts; i++) {
           await driver.wait(async function () {
@@ -301,13 +323,10 @@ describe('End-to-end workflow tests', function() {
               expect(history.length).to.equal(numberOfParticipants);
               return true;
             }
-          }, shortTimeout);
+          }, medTimeout);
         }
 
-        // unmask
-        // click link to unmask page
-      // });
-
+      });
     } catch (err) {
       handleFailure(err, driver);
     }
@@ -315,30 +334,35 @@ describe('End-to-end workflow tests', function() {
 
   async function unmaskData(driver) {
     try {
+      await driver.get('localhost:8080/unmask').then(async function() {
+        await driver.wait(async function () {
+          var session = driver.findElement(By.id('session'));
+          var password = driver.findElement(By.id('session-password'));
+          if (session.isDisplayed() && password.isDisplayed()) {
+            session.sendKeys(sessionKey);
+            password.sendKeys(sessionPassword);
 
-      driver.findElement(By.id('session'))
-        .then((key) =>  key.sendKeys(sessionKey) )
-        .then(() => driver.findElement(By.id('session-password')) )
-        .then((password) => password.sendKeys(sessionPassword) )
-      await driver.sleep(500);
-      var fileUpload = await driver.findElement(By.id('choose-file'));
-      var filePath = getUserHome() + '/Downloads/' + 'Session_' + sessionKey + '_private_key.pem'
-      fileUpload.sendKeys(filePath);
-  
-  
-      var tableValues;
-      await driver.wait(async function () {
-        tableValues = await driver.findElements(By.xpath('//td[@class="htDimmed"]'));
-        return (tableValues.length > 0);
-      }, 180000);
-  
-      // check values
-      for (var i = 0; i < tableValues.length; i++) {
-        var value = await tableValues[i].getText();
-        if (!isNaN(parseInt(value))) {
-          expect(parseInt(value)).to.equal(dataValue * numberOfParticipants);
+            var fileUpload = await driver.findElement(By.id('choose-file'));
+            var filePath = getUserHome() + '/Downloads/' + 'Session_' + sessionKey + '_private_key.pem'
+            fileUpload.sendKeys(filePath);
+            return true;
+          }
+        }, shortTimeout);
+    
+        var tableValues;
+        await driver.wait(async function () {
+          tableValues = await driver.findElements(By.xpath('//td[@class="htDimmed"]'));
+          return (tableValues.length > 0);
+        }, unmaskingTimeout);
+    
+        // check values
+        for (var i = 0; i < tableValues.length; i++) {
+          var value = await tableValues[i].getText();
+          if (!isNaN(parseInt(value))) {
+            expect(parseInt(value)).to.equal(dataValue);
+          }
         }
-      }
+      });
     } catch (err) {
       handleFailure(err, driver);
     }
