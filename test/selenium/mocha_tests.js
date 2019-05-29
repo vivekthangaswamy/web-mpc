@@ -39,11 +39,11 @@ describe('End-to-end workflow tests', function() {
   });
 
   it('Basic end to end test with cohort self selection', async () => {
-    // await createSession(driver);
-    // await generateParticipantLinks(driver, 'null');
-    // await dataSubmission(driver);
-    // await closeSession(driver);
-    await unmaskData(driver);
+    await createSession(driver);
+    await generateParticipantLinks(driver, 'null');
+    await dataSubmission(driver);
+    await closeSession(driver);
+    // await unmaskData(driver);
   });    
 
   // - - - - - - - 
