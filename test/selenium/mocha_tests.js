@@ -39,11 +39,11 @@ describe('End-to-end workflow tests', function() {
   });
 
   it('Basic end to end test with cohort self selection', async () => {
-    await createSession(driver);
-    await generateParticipantLinks(driver, 'null');
-    await dataSubmission(driver);
-    await closeSession(driver);
-    // await unmaskData(driver);
+    // await createSession(driver);
+    // await generateParticipantLinks(driver, 'null');
+    // await dataSubmission(driver);
+    // await closeSession(driver);
+    await unmaskData(driver);
   });    
 
   // - - - - - - - 
@@ -256,10 +256,6 @@ describe('End-to-end workflow tests', function() {
     try {
       //switch back to manage page
       await driver.get('localhost:8080/manage').then(async function() {
-
-        sessionKey = 'x3y3ncm6nyh97a5wa0dbqh5g54';
-        sessionPassword = 'zfgns9c4knb9d3qn8kd9n3g7aw';
-
         await driver.wait(async function () {
           var session = driver.findElement(By.id('session'));
           var password = driver.findElement(By.id('password'));
